@@ -65,6 +65,7 @@ export interface AggregateDetail {
 
 export interface AggregatePlayResponse {
   url: string;
+  directUrl: string;
   mode: 'strict';
   kind: 'hls' | 'file';
   sourceName: string;

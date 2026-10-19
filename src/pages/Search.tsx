@@ -32,6 +32,15 @@ import { Player } from '../components/Player';
 const EXAMPLES = ['哪吒', '流浪地球', '甄嬛传', '沙丘', '狂飙', '奥本海默'];
 const BATCH_SIZE = 8;
 const CONCURRENCY = 3;
+const PREFERRED_SOURCES = ['zuida', 'feifan', 'jisu', 'baofeng', 'baiduyun'];
+
+function preferredOffer(result: AggregateResult) {
+  for (const id of PREFERRED_SOURCES) {
+    const offer = result.offers.find((entry) => entry.sourceId === id);
+    if (offer) return offer;
+  }
+  return result.offers[0];
+}
 
 function mergeResults(current: AggregateResult[], incoming: AggregateResult[]) {
   const map = new Map(current.map((item) => [item.key, { ...item, offers: [...item.offers] }]));
@@ -96,6 +105,7 @@ export function SearchPage() {
   const [playSession, setPlaySession] = useState<AggregatePlayResponse | null>(null);
   const [playLoading, setPlayLoading] = useState('');
   const runId = useRef(0);
+  const detailRequest = useRef(0);
 
   useEffect(() => {
     setInput(q);
@@ -179,6 +189,7 @@ export function SearchPage() {
   };
 
   const openDetail = async (result: AggregateResult, sourceId: string) => {
+    const requestId = ++detailRequest.current;
     setSelected(result);
     setActiveSourceId(sourceId);
     setDetail(null);
@@ -192,11 +203,17 @@ export function SearchPage() {
           result.offers.find((offer) => offer.sourceId === sourceId)?.vodId ?? '',
         )}`,
       );
+      if (requestId !== detailRequest.current) return;
       setDetail(data);
+      const directGroup = data.groups.findIndex((item) =>
+        item.episodes.some((episode) => episode.direct),
+      );
+      setGroupIndex(directGroup >= 0 ? directGroup : 0);
     } catch (error) {
+      if (requestId !== detailRequest.current) return;
       setDetailError(error instanceof Error ? error.message : '详情加载失败');
     } finally {
-      setDetailLoading(false);
+      if (requestId === detailRequest.current) setDetailLoading(false);
     }
   };
 
@@ -379,7 +396,7 @@ export function SearchPage() {
                     <button
                       type="button"
                       className="btn btn-primary btn-compact"
-                      onClick={() => void openDetail(result, result.offers[0].sourceId)}
+                      onClick={() => void openDetail(result, preferredOffer(result).sourceId)}
                     >
                       <Play size={14} fill="currentColor" /> 查看线路
                     </button>
@@ -431,7 +448,9 @@ export function SearchPage() {
                   </button>
                 </div>
                 <Player
-                  src={playSession.url}
+                  src={playSession.directUrl || playSession.url}
+                  fallbackSrc={playSession.directUrl ? playSession.url : undefined}
+                  clientFilter
                   kind={playSession.kind}
                   adMode={playSession.mode}
                   artwork={{
@@ -444,7 +463,7 @@ export function SearchPage() {
                 <div className="aggregate-player-note">
                   <ShieldCheck size={14} />
                   <span>
-                    播放链路：{playSession.sourceName} → 签名代理 → 严格广告过滤。直链与播放页解析均已启用。
+                    播放链路：{playSession.sourceName} → 浏览器直连 + 客户端严格过滤；直连失败时自动切换签名代理。
                   </span>
                 </div>
               </div>

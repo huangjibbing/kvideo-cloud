@@ -19,12 +19,15 @@ import {
 } from 'lucide-react';
 import { formatTime } from '../lib/api';
 import type { CatalogTitle } from '../../shared/types';
+import { filterM3u8 } from '../../shared/adfilter';
 
 interface PlayerProps {
   src: string;
   artwork: Pick<CatalogTitle, 'accent' | 'motif' | 'title' | 'originalTitle'>;
   adMode: string;
   kind?: 'hls' | 'file';
+  fallbackSrc?: string;
+  clientFilter?: boolean;
   autoPlay?: boolean;
   onProgress?: (current: number, duration: number) => void;
   onAdStats?: (removed: number) => void;
@@ -35,6 +38,8 @@ export function Player({
   artwork,
   adMode,
   kind = 'hls',
+  fallbackSrc,
+  clientFilter = false,
   autoPlay = true,
   onProgress,
   onAdStats,
@@ -61,6 +66,13 @@ export function Player({
   const [error, setError] = useState('');
   const [adRemoved, setAdRemoved] = useState(0);
   const [reloadKey, setReloadKey] = useState(0);
+  const [activeSrc, setActiveSrc] = useState(src);
+  const fallbackTried = useRef(false);
+
+  useEffect(() => {
+    setActiveSrc(src);
+    fallbackTried.current = false;
+  }, [src]);
 
   const resetHideTimer = useCallback(() => {
     setShowControls(true);
@@ -78,7 +90,7 @@ export function Player({
     setQuality(-1);
     setAdRemoved(0);
     const video = videoRef.current;
-    if (!video || !src) return;
+    if (!video || !activeSrc) return;
 
     if (hlsRef.current) {
       hlsRef.current.destroy();
@@ -86,7 +98,7 @@ export function Player({
     }
 
     if (kind === 'file') {
-      video.src = src;
+      video.src = activeSrc;
       setLoading(false);
       if (autoPlay) video.play().catch(() => undefined);
       return () => {
@@ -96,6 +108,7 @@ export function Player({
     }
 
     const attachAdStats = (data: { networkDetails?: unknown }) => {
+      if (clientFilter) return;
       try {
         const xhr = data.networkDetails as XMLHttpRequest | undefined;
         const value = Number(xhr?.getResponseHeader?.('X-KV-Ads-Removed') ?? 0);
@@ -109,6 +122,58 @@ export function Player({
     };
 
     if (Hls.isSupported()) {
+      let ClientFilterLoader: any;
+      if (clientFilter) {
+        const DefaultLoader = (Hls as unknown as { DefaultConfig: { loader: new () => unknown } })
+          .DefaultConfig.loader as new () => {
+          load(
+            context: { type?: string; url: string },
+            config: unknown,
+            callbacks: {
+              onSuccess: (
+                response: { data?: unknown },
+                stats: unknown,
+                responseContext: unknown,
+                networkDetails: unknown,
+              ) => void;
+            },
+          ): void;
+        };
+        ClientFilterLoader = class extends DefaultLoader {
+          load(
+            context: { type?: string; url: string },
+            config: unknown,
+            callbacks: {
+              onSuccess: (
+                response: { data?: unknown },
+                stats: unknown,
+                responseContext: unknown,
+                networkDetails: unknown,
+              ) => void;
+            },
+          ) {
+            if (context.type === 'manifest' || context.type === 'level') {
+              const originalOnSuccess = callbacks.onSuccess;
+              callbacks.onSuccess = (response, stats, responseContext, networkDetails) => {
+                if (typeof response.data === 'string') {
+                  try {
+                    const filtered = filterM3u8(response.data, context.url, { mode: 'strict' });
+                    response.data = filtered.content;
+                    if (filtered.removedSegments > 0) {
+                      setAdRemoved((previous) => Math.max(previous, filtered.removedSegments));
+                      onAdStats?.(filtered.removedSegments);
+                    }
+                  } catch {
+                    // Keep the original manifest if client filtering fails.
+                  }
+                }
+                originalOnSuccess(response, stats, responseContext, networkDetails);
+              };
+            }
+            super.load(context, config, callbacks);
+          }
+        };
+      }
       const hls = new Hls({
         enableWorker: true,
         lowLatencyMode: false,
@@ -119,9 +184,10 @@ export function Player({
         fragLoadingMaxRetry: 5,
         manifestLoadingMaxRetry: 3,
         levelLoadingMaxRetry: 3,
+        ...(ClientFilterLoader ? { loader: ClientFilterLoader as never } : {}),
       });
       hlsRef.current = hls;
-      hls.loadSource(src);
+      hls.loadSource(activeSrc);
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_LOADED, (_event, data) => attachAdStats(data));
       hls.on(Hls.Events.LEVEL_LOADED, (_event, data) => attachAdStats(data));
@@ -146,6 +212,13 @@ export function Player({
           return;
         }
         if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+          if (fallbackSrc && !fallbackTried.current && activeSrc !== fallbackSrc) {
+            fallbackTried.current = true;
+            setError('');
+            setLoading(true);
+            setActiveSrc(fallbackSrc);
+            return;
+          }
           setError('视频流连接失败，可能是源站限制或网络波动。');
         } else {
           setError('播放器无法解码这条视频流。');
@@ -153,7 +226,7 @@ export function Player({
         setLoading(false);
       });
     } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-      video.src = src;
+      video.src = activeSrc;
       setLoading(false);
       if (autoPlay) video.play().catch(() => undefined);
     } else {
@@ -167,7 +240,7 @@ export function Player({
         hlsRef.current = null;
       }
     };
-  }, [src, autoPlay, onAdStats, reloadKey, kind]);
+  }, [activeSrc, autoPlay, onAdStats, reloadKey, kind, clientFilter, fallbackSrc]);
 
   useEffect(() => {
     const video = videoRef.current;

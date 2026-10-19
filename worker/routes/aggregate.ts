@@ -262,45 +262,63 @@ function extractMediaUrl(text: string, pageUrl: string) {
     .replace(/\\\//g, '/')
     .replace(/\\u002F/gi, '/')
     .replace(/&amp;/g, '&');
-  const player = cleaned.match(/player_[a-zA-Z0-9_]+\s*=\s*(\{[\s\S]*?\})\s*<\/script>/);
+  const absolutize = (value: string) => {
+    if (!value) return '';
+    if (value.startsWith('//')) return `https:${value}`;
+    try {
+      return new URL(value, pageUrl).toString();
+    } catch {
+      return '';
+    }
+  };
+  const mediaFrom = (value: string) => {
+    const url = absolutize(value.trim());
+    return /\.(m3u8|mp4)(?:[?#]|$)/i.test(url) ? url : '';
+  };
+
+  const player = cleaned.match(/player_[a-zA-Z0-9_]+\s*=\s*(\{[\s\S]*?\})\s*;?\s*<\/script>/);
   if (player) {
     try {
       const data = JSON.parse(player[1]) as { url?: string };
-      if (data.url) {
-        const url = data.url.startsWith('//') ? `https:${data.url}` : data.url;
-        if (/^https?:\/\//i.test(url)) return url;
-      }
+      const url = data.url ? mediaFrom(data.url) : '';
+      if (url) return url;
     } catch {
-      // Fall through to regex extraction.
+      // Fall through to source-level extraction.
     }
   }
-  const candidates = [
-    ...cleaned.matchAll(/https?:\/\/[^"'\s<>\\]+?\.m3u8[^"'\s<>\\]*/gi),
-    ...cleaned.matchAll(/https?:\/\/[^"'\s<>\\]+?\.mp4[^"'\s<>\\]*/gi),
+
+  // MacCMS share pages commonly expose `const url = "/path/index.m3u8?sign=..."`.
+  const assignments = [
+    ...cleaned.matchAll(/(?:const|let|var)\s+(?:url|vid|videoUrl|playUrl)\s*=\s*['"]([^'"]+)['"]/gi),
+    ...cleaned.matchAll(/\burl\s*:\s*['"]([^'"]+)['"]/gi),
+    ...cleaned.matchAll(/['"]([^'"]+?\.m3u8[^'"]*)['"]/gi),
+    ...cleaned.matchAll(/['"]([^'"]+?\.mp4[^'"]*)['"]/gi),
   ];
-  for (const match of candidates) {
-    const raw = match[0];
-    try {
-      return new URL(raw, pageUrl).toString();
-    } catch {
-      // Keep looking.
-    }
+  for (const match of assignments) {
+    const url = mediaFrom(match[1] ?? '');
+    if (url) return url;
   }
   return '';
 }
 
 async function resolvePlayable(source: VideoSource, episodeUrl: string) {
   if (/\.(m3u8|mp4)(?:[?#]|$)/i.test(episodeUrl)) {
-    return { url: episodeUrl, kind: /\.mp4(?:[?#]|$)/i.test(episodeUrl) ? 'file' : 'hls' } as const;
+    return {
+      url: episodeUrl,
+      kind: /\.mp4(?:[?#]|$)/i.test(episodeUrl) ? ('file' as const) : ('hls' as const),
+      referer: `${new URL(episodeUrl).origin}/`,
+    };
   }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 9000);
   try {
+    const pageReferer = `${new URL(episodeUrl).origin}/`;
     const response = await fetch(episodeUrl, {
       headers: {
         'User-Agent': UA,
         Accept: 'text/html,application/xhtml+xml,application/json,*/*',
-        Referer: source.baseUrl,
+        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8',
+        Referer: pageReferer,
       },
       redirect: 'follow',
       signal: controller.signal,
@@ -309,11 +327,15 @@ async function resolvePlayable(source: VideoSource, episodeUrl: string) {
     const finalUrl = response.url || episodeUrl;
     const text = await response.text();
     if (text.trimStart().startsWith('#EXTM3U') || /\.m3u8(?:[?#]|$)/i.test(finalUrl)) {
-      return { url: finalUrl, kind: 'hls' } as const;
+      return { url: finalUrl, kind: 'hls' as const, referer: finalUrl };
     }
     const media = extractMediaUrl(text, finalUrl);
     if (!media) throw new Error('未能从播放页解析出 m3u8/mp4 地址');
-    return { url: media, kind: /\.mp4(?:[?#]|$)/i.test(media) ? 'file' : 'hls' } as const;
+    return {
+      url: media,
+      kind: /\.mp4(?:[?#]|$)/i.test(media) ? ('file' as const) : ('hls' as const),
+      referer: finalUrl,
+    };
   } finally {
     clearTimeout(timer);
   }
@@ -329,7 +351,7 @@ aggregateRoutes.post('/aggregate/play', async (c) => {
   if (!rateLimit(`aggregate-play:${user.id}`, 60, 60_000)) {
     throw new HTTPException(429, { message: '播放请求过于频繁' });
   }
-  let resolved: { url: string; kind: 'hls' | 'file' };
+  let resolved: { url: string; kind: 'hls' | 'file'; referer: string };
   try {
     resolved = await resolvePlayable(source, episodeUrl);
   } catch (error) {
@@ -342,12 +364,13 @@ aggregateRoutes.post('/aggregate/play', async (c) => {
   const expiresAt = Date.now() + 12 * 3600_000;
   const url = await createSignedProxyUrl(
     new URL(c.req.url).origin,
-    { url: resolved.url, mode: 'strict', referer: source.baseUrl },
+    { url: resolved.url, mode: 'strict', referer: resolved.referer },
     secret,
     expiresAt,
   );
   return c.json({
     url,
+    directUrl: resolved.url,
     mode: 'strict' as const,
     kind: resolved.kind,
     sourceName: source.name,
