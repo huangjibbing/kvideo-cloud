@@ -1,8 +1,15 @@
 import { Hono } from 'hono';
 import { CATALOG, GENRES, catalogStats, findTitle } from '../../shared/catalog';
 import { groupFor, levelForPoints, PLANS } from '../../shared/levels';
+import {
+  SOURCE_META,
+  VIDEO_SOURCES,
+  VIDEO_SOURCE_STATS,
+  findVideoSource,
+  sourceHost,
+} from '../../shared/sources';
 import type { AppEnv } from '../lib/db';
-import { getSettings, toPublicUser, type UserRow } from '../lib/db';
+import { clientIp, getSettings, rateLimit, toPublicUser, type UserRow } from '../lib/db';
 
 export const publicRoutes = new Hono<AppEnv>();
 
@@ -74,6 +81,53 @@ publicRoutes.get('/titles/:id', async (c) => {
 });
 
 publicRoutes.get('/plans', (c) => c.json({ plans: PLANS }));
+
+publicRoutes.get('/video-sources', (c) =>
+  c.json({
+    sources: VIDEO_SOURCES.map((source) => ({ ...source, host: sourceHost(source.baseUrl) })),
+    meta: SOURCE_META,
+    stats: VIDEO_SOURCE_STATS,
+  }),
+);
+
+publicRoutes.get('/video-sources/:id/ping', async (c) => {
+  const source = findVideoSource(c.req.param('id'));
+  if (!source) return c.json({ error: '资源站不存在' }, 404);
+  if (!rateLimit(`source-ping:${clientIp(c)}`, 90, 60_000)) {
+    return c.json({ error: '检测过于频繁，请稍后再试' }, 429);
+  }
+  const startedAt = Date.now();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(source.baseUrl, {
+      method: 'GET',
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0 Safari/537.36',
+        Accept: 'application/json,text/plain,*/*',
+      },
+      redirect: 'follow',
+      signal: controller.signal,
+    });
+    return c.json({
+      ok: response.status < 500,
+      status: response.status,
+      latency: Date.now() - startedAt,
+      host: sourceHost(source.baseUrl),
+    });
+  } catch {
+    return c.json({
+      ok: false,
+      status: 0,
+      latency: Date.now() - startedAt,
+      host: sourceHost(source.baseUrl),
+      error: '无法连接',
+    });
+  } finally {
+    clearTimeout(timer);
+  }
+});
 
 publicRoutes.get('/leaderboard', async (c) => {
   const rows = await c.env.DB.prepare(

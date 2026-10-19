@@ -9,6 +9,7 @@ import { ProfilePage } from './pages/Profile';
 import { MembershipPage } from './pages/Membership';
 import { LeaderboardPage } from './pages/Leaderboard';
 import { AdminPage } from './pages/Admin';
+import { SourcesPage } from './pages/Sources';
 import { Link, useRouter } from './lib/router';
 
 function NotFound() {
@@ -45,6 +46,7 @@ function Routes() {
   if (segments[0] === 'me') return <ProfilePage />;
   if (segments[0] === 'membership') return <MembershipPage />;
   if (segments[0] === 'leaderboard') return <LeaderboardPage />;
+  if (segments[0] === 'sources') return <SourcesPage />;
   if (segments[0] === 'admin') return <AdminPage />;
   return <NotFound />;
 }

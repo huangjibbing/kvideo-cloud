@@ -20,6 +20,7 @@
     "test:watch": "vitest",
     "smoke": "node scripts/smoke.mjs",
     "screenshot": "node scripts/screenshot.mjs",
+    "import:sources": "node scripts/import-sources.mjs",
     "typecheck": "tsc -p tsconfig.app.json && tsc -p tsconfig.worker.json",
     "db:migrate:local": "wrangler d1 migrations apply kvideo-db --local",
     "db:migrate:remote": "wrangler d1 migrations apply kvideo-db --remote",

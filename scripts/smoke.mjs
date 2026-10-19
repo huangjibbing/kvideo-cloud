@@ -37,6 +37,11 @@ const config = await call('/api/config');
 assert(config.stats.titles >= 10, 'catalog stats');
 assert(config.announcement.includes('广告'), 'announcement utf-8');
 
+const sourceRegistry = await call('/api/video-sources');
+assert(sourceRegistry.sources.length === 56, 'source registry imported 56');
+assert(sourceRegistry.sources.every((source) => source.group !== 'premium'), 'premium filtered');
+assert(sourceRegistry.meta.filteredPremium === 22, 'premium count');
+
 console.log('--- auth ---');
 const registered = await call('/api/auth/register', {
   method: 'POST',

@@ -36,6 +36,13 @@ KVideo Cloud 的代理会在云端解析每一份主/子播放列表，识别并
 - 自定义 HLS 片源，按用户组限制 3–100 个额度，仅所有者可见。
 - 搜索、类型、标签、排序、精选、趋势、新上线。
 
+### 资源站目录
+
+- 从 `2334.json` 导入 78 个源站配置，按 `group` 字段过滤掉 22 个 `premium` 资源，保留 56 个 `normal` 资源站。
+- `/sources` 页面支持搜索、分组过滤、连接检测、复制 API 地址与原始 JSON 跳转。
+- 数据静态写入 `data/video-sources.json`，重新导入：`npm run import:sources`。
+- 连接检测通过 Worker 端安全代理完成，只允许目录中的 `baseUrl`，并带每 IP 限流。
+
 ### 账号、用户组与会员
 
 - 邮箱注册 / 登录，PBKDF2-SHA256（100,000 次）密码哈希，HttpOnly + SameSite=Lax 会话 Cookie，会话哈希落库。
@@ -83,11 +90,15 @@ shared/
   adfilter.ts          纯函数广告过滤引擎
   catalog.ts           公开片库
   levels.ts            用户组、等级、会员方案
+  sources.ts           资源站类型与统计
   types.ts             共享类型
+data/
+  video-sources.json   过滤 premium 后的 56 个资源站
+  video-sources.meta.json
 src/                   React 前端
 migrations/            D1 初始化 SQL
-tests/                 广告过滤单元测试
-scripts/               smoke、本地预览、截图
+tests/                 广告过滤与资源站单元测试
+scripts/               smoke、导入、本地预览、截图
 ```
 
 ## 本地运行
@@ -101,6 +112,18 @@ npm run dev:local
 ```
 
 打开 `http://127.0.0.1:8787`。
+
+重新导入资源站并过滤 `premium`：
+
+```bash
+npm run import:sources
+```
+
+如果本机访问 raw.githubusercontent.com 不稳定，可以先把 JSON 下载到本地，再执行：
+
+```bash
+SOURCE_FILE=./2334.json npm run import:sources
+```
 
 `dev:local` 使用真实的 Hono Worker 代码 + 一个 D1 形状的 Node SQLite 适配器。它只用于本地预览和自动化测试；生产环境使用 Cloudflare D1。
 

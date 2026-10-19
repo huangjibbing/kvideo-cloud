@@ -8,6 +8,7 @@ import {
   LogIn,
   Moon,
   Search,
+  Server,
   ShieldCheck,
   Sparkles,
   Sun,
@@ -22,6 +23,7 @@ import { AuthModal } from './AuthModal';
 const NAV = [
   { to: '/', label: '首页', icon: Home },
   { to: '/browse', label: '片库', icon: LayoutGrid },
+  { to: '/sources', label: '资源站', icon: Server },
   { to: '/membership', label: '会员', icon: Crown },
   { to: '/leaderboard', label: '榜单', icon: Trophy },
 ];
@@ -138,6 +140,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <h4>探索</h4>
             <Link to="/browse">全部片库</Link>
             <Link to="/browse?type=film">开放电影</Link>
+            <Link to="/sources">资源站目录</Link>
             <Link to="/browse?type=demo">技术实验室</Link>
             <Link to="/leaderboard">光影榜单</Link>
           </div>
