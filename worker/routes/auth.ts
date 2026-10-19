@@ -94,6 +94,9 @@ authRoutes.post('/auth/register', async (c) => {
   if (password.length < 8 || password.length > 72) {
     throw new HTTPException(400, { message: '密码长度需在 8–72 位之间' });
   }
+  if (settings.inviteOnly && !inviteCode) {
+    throw new HTTPException(403, { message: '当前仅开放邀请注册，请填写邀请码' });
+  }
   if (await getUserByEmail(c.env, email)) {
     throw new HTTPException(409, { message: '这个邮箱已经注册过了' });
   }
@@ -137,7 +140,9 @@ authRoutes.post('/auth/register', async (c) => {
     throw new HTTPException(409, { message: '邮箱或昵称已被占用' });
   }
 
-  await awardPoints(c.env, id, 50, 'welcome', '欢迎来到 KVideo Cloud', { multiply: false });
+  await awardPoints(c.env, id, settings.welcomePoints, 'welcome', '欢迎来到 KVideo Cloud', {
+    multiply: false,
+  });
   if (invite) {
     await c.env.DB.prepare(
       'UPDATE invites SET used_by = ?, used_at = ? WHERE code = ? AND used_by IS NULL',

@@ -119,7 +119,7 @@ export const PLANS: Plan[] = [
     tier: 'plus',
     badge: 'PLUS',
     accent: '#5ee7d4',
-    perks: ['光影会员身份', '积分加成 1.2×', '自定义片源 10 个', '专属评论徽章'],
+    perks: ['光影会员身份', '全站 VIP 影片', '积分加成 1.2×', '自定义片源 10 个'],
   },
   {
     id: 'quarter',
@@ -129,7 +129,7 @@ export const PLANS: Plan[] = [
     tier: 'plus',
     badge: 'PLUS',
     accent: '#7c9dff',
-    perks: ['光影会员身份', '积分加成 1.2×', '自定义片源 10 个', '季度限定光效'],
+    perks: ['光影会员身份', '全站 VIP 影片', '积分加成 1.2×', '季度限定光效'],
   },
   {
     id: 'year',
@@ -139,7 +139,7 @@ export const PLANS: Plan[] = [
     tier: 'pro',
     badge: 'PRO',
     accent: '#ff7ca8',
-    perks: ['星幕会员身份', '积分加成 1.5×', '自定义片源 50 个', '专属主页光晕'],
+    perks: ['星幕会员身份', '全站 VIP 影片', '积分加成 1.5×', '专属主页光晕'],
   },
   {
     id: 'lifetime',
@@ -149,7 +149,7 @@ export const PLANS: Plan[] = [
     tier: 'lifetime',
     badge: 'LIFE',
     accent: '#ffe6a7',
-    perks: ['永久会员身份', '积分加成 1.5×', '自定义片源 100 个', '限定永恒徽章'],
+    perks: ['永久会员身份', '全站 VIP 影片', '积分加成 1.5×', '限定永恒徽章'],
   },
 ];
 

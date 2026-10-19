@@ -23,6 +23,7 @@ import type {
   AggregateSearchResponse,
 } from '../../shared/aggregate';
 import { extractMediaUrlFromHtml } from '../../shared/aggregate';
+import { isVipPublicUser } from '../../shared/vip';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { api, ApiError } from '../lib/api';
@@ -242,6 +243,11 @@ export function SearchPage() {
       openAuth('login');
       return;
     }
+    if (detail.vip && !isVipPublicUser(me.user)) {
+      push('这是 VIP 专属影片，请先开通会员。', 'info');
+      navigate('/membership');
+      return;
+    }
     setPlayLoading(episode.url);
     try {
       const data = await api<AggregatePlayResponse>('/aggregate/play', {
@@ -272,6 +278,7 @@ export function SearchPage() {
             title: detail.title,
             episode: episode.name,
             expiresAt: '',
+            vip: Boolean(detail.vip),
           });
           return;
         } catch {
@@ -419,6 +426,7 @@ export function SearchPage() {
                     <div className="aggregate-card-top">
                       <span className="aggregate-year">{result.year || '年份未知'}</span>
                       {result.typeName ? <span className="aggregate-type">{result.typeName}</span> : null}
+                      {result.vip ? <span className="vip-chip">VIP</span> : null}
                       <span className="aggregate-offer-count">{result.offers.length} 条线路</span>
                     </div>
                     <h3>{result.title}</h3>
@@ -465,6 +473,7 @@ export function SearchPage() {
                   <span>{detail?.year || selected.year || '年份未知'}</span>
                   {detail?.typeName ? <span>{detail.typeName}</span> : null}
                   {detail?.remarks ? <span>{detail.remarks}</span> : null}
+                  {detail?.vip ? <span className="vip-chip">VIP 专属</span> : null}
                 </div>
                 {detail?.actor ? <p className="aggregate-modal-credits">主演：{detail.actor}</p> : null}
               </div>

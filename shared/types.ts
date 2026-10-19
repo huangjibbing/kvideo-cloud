@@ -145,6 +145,11 @@ export interface SiteSettings {
   announcement: string;
   registrationOpen: boolean;
   watchRewardEnabled: boolean;
+  vipAll: boolean;
+  vipAutoSearch: boolean;
+  vipLabel: string;
+  inviteOnly: boolean;
+  welcomePoints: number;
 }
 
 export interface AdminStats {

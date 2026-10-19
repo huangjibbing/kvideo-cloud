@@ -11,6 +11,7 @@ import { FEED_CATEGORIES } from '../../shared/feed';
 import { findVideoSource, type VideoSource } from '../../shared/sources';
 import type { AppEnv } from '../lib/db';
 import { clientIp, rateLimit } from '../lib/db';
+import { loadVipResolver } from '../lib/vip';
 
 export const feedRoutes = new Hono<AppEnv>();
 
@@ -128,6 +129,7 @@ function itemFrom(source: VideoSource, item: Record<string, unknown>, index: num
     score: Number.isFinite(score) ? score : 0,
     categories: categoriesOf(typeName, area, clean(item.vod_class)),
     offers: [offer],
+    vip: false,
     sourceId: source.id,
     sourceName: source.name,
     vodId,
@@ -163,7 +165,7 @@ async function loadPool() {
   );
   const jobs: Array<Promise<FeedItem[]>> = [];
   for (const source of sources) {
-    for (let page = 1; page <= 3; page += 1) {
+    for (let page = 1; page <= 2; page += 1) {
       jobs.push(
         fetchJson(apiUrl(source, page))
           .then((payload) => {
@@ -253,19 +255,21 @@ feedRoutes.get('/feed/home', async (c) => {
     return c.json({ error: '请求过于频繁' }, 429);
   }
   const pool = await loadPool();
-  const heroPool = pool.filter((item) => item.poster);
+  const vip = await loadVipResolver(c.env);
+  const decorated = pool.map((item) => ({ ...item, vip: vip.resolver(item.key) }));
+  const heroPool = decorated.filter((item) => item.poster);
   const hero = heroPool
     .slice()
     .sort((a, b) => b.offers.length - a.offers.length || Number(b.year) - Number(a.year))
     .slice(0, 6);
   const sections = (['movie', 'series', 'anime', 'variety', 'domestic', 'overseas', 'documentary', 'short'] as FeedCategory[])
-    .map((id) => sectionOf(id, pool))
+    .map((id) => sectionOf(id, decorated))
     .filter((section) => section.items.length > 0);
   const response: FeedHome = {
     hero,
     sections,
     categories: FEED_CATEGORIES,
-    total: pool.length,
+    total: decorated.length,
     sourceCount: FEED_SOURCE_IDS.length,
     updatedAt: new Date().toISOString(),
   };
@@ -280,7 +284,9 @@ feedRoutes.get('/feed/category', async (c) => {
   const category = (FEED_CATEGORIES.find((item) => item.id === requested)?.id ?? 'movie') as FeedCategory;
   const page = Math.max(1, Math.min(10, Number(c.req.query('page')) || 1));
   const pool = await loadPool();
-  let items = pool.filter((item) => item.categories.includes(category));
+  const vip = await loadVipResolver(c.env);
+  const decorated = pool.map((item) => ({ ...item, vip: vip.resolver(item.key) }));
+  let items = decorated.filter((item) => item.categories.includes(category));
   if (category === 'domestic' || category === 'overseas') {
     items = items.filter((item) => item.categories.includes('series'));
   }

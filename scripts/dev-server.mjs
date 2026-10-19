@@ -7,7 +7,7 @@
  * and automated UI checks; production still uses Cloudflare D1.
  */
 import { createServer } from 'node:http';
-import { readFile, stat, mkdir } from 'node:fs/promises';
+import { readFile, readdir, stat, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { extname, join, normalize, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -21,8 +21,10 @@ await mkdir(localDir, { recursive: true });
 
 const db = new DatabaseSync(join(localDir, 'kvideo.sqlite'));
 db.exec('PRAGMA foreign_keys = ON;');
-const migrationPath = join(root, 'migrations', '0001_init.sql');
-db.exec(await readFile(migrationPath, 'utf8'));
+const migrationsDir = join(root, 'migrations');
+for (const file of (await readdir(migrationsDir)).filter((name) => name.endsWith('.sql')).sort()) {
+  db.exec(await readFile(join(migrationsDir, file), 'utf8'));
+}
 
 class Statement {
   constructor(database, sql) {

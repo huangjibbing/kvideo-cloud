@@ -12,6 +12,7 @@ import {
 } from '../lib/db';
 import { awardPoints } from '../lib/points';
 import type { AdminUser } from '../../shared/types';
+import { normalizeVideoKey } from '../../shared/vip';
 
 export const adminRoutes = new Hono<AppEnv>();
 
@@ -178,6 +179,17 @@ adminRoutes.put('/admin/settings', async (c) => {
   if (body.watchRewardEnabled !== undefined) {
     updates.push(['watchRewardEnabled', body.watchRewardEnabled ? '1' : '0']);
   }
+  if (body.vipAll !== undefined) updates.push(['vipAll', body.vipAll ? '1' : '0']);
+  if (body.vipAutoSearch !== undefined) {
+    updates.push(['vipAutoSearch', body.vipAutoSearch ? '1' : '0']);
+  }
+  if (body.vipLabel !== undefined) {
+    updates.push(['vipLabel', String(body.vipLabel).trim().slice(0, 16) || 'VIP']);
+  }
+  if (body.inviteOnly !== undefined) updates.push(['inviteOnly', body.inviteOnly ? '1' : '0']);
+  if (body.welcomePoints !== undefined) {
+    updates.push(['welcomePoints', String(Math.max(0, Math.min(10000, Number(body.welcomePoints) || 0)))]);
+  }
   if (updates.length === 0) throw new HTTPException(400, { message: '没有需要保存的设置' });
   await c.env.DB.batch(
     updates.map(([key, value]) =>
@@ -195,8 +207,95 @@ adminRoutes.put('/admin/settings', async (c) => {
   });
 });
 
-adminRoutes.get('/admin/ledger', async (c) => {
+adminRoutes.get('/admin/vip', async (c) => {
   await requireAdmin(c);
+  const settings = await getSettings(c.env, true);
+  const rows = await c.env.DB.prepare(
+    'SELECT key, source_id, vod_id, title, year, vip, tags, updated_at FROM video_tags ORDER BY updated_at DESC LIMIT 200',
+  ).all<{
+    key: string;
+    source_id: string;
+    vod_id: string;
+    title: string;
+    year: string;
+    vip: number;
+    tags: string;
+    updated_at: string;
+  }>();
+  const stats = await c.env.DB.prepare(
+    'SELECT COUNT(*) AS total, COALESCE(SUM(vip), 0) AS vip FROM video_tags',
+  ).first<{ total: number; vip: number }>();
+  return c.json({
+    settings,
+    stats: { tagged: stats?.total ?? 0, vip: stats?.vip ?? 0 },
+    tags: (rows.results ?? []).map((row) => ({
+      key: row.key,
+      sourceId: row.source_id,
+      vodId: row.vod_id,
+      title: row.title,
+      year: row.year,
+      vip: Boolean(row.vip),
+      tags: row.tags,
+      updatedAt: row.updated_at,
+    })),
+  });
+});
+
+adminRoutes.post('/admin/vip/tag', async (c) => {
+  await requireAdmin(c);
+  const body = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>));
+  const title = String(body.title ?? '').trim().slice(0, 160);
+  if (!title) throw new HTTPException(400, { message: '请填写影片标题' });
+  const year = String(body.year ?? '').trim().slice(0, 8);
+  const key = String(body.key ?? '').trim() || normalizeVideoKey(title, year);
+  const vip = body.vip === true || body.vip === 'true' || body.vip === 1;
+  const tags = String(body.tags ?? '').trim().slice(0, 200);
+  await c.env.DB.prepare(
+    `INSERT INTO video_tags (key, source_id, vod_id, title, year, vip, tags, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+     ON CONFLICT(key) DO UPDATE SET
+       source_id = excluded.source_id,
+       vod_id = excluded.vod_id,
+       title = excluded.title,
+       year = excluded.year,
+       vip = excluded.vip,
+       tags = excluded.tags,
+       updated_at = excluded.updated_at`,
+  )
+    .bind(
+      key,
+      String(body.sourceId ?? '').slice(0, 80),
+      String(body.vodId ?? '').slice(0, 80),
+      title,
+      year,
+      vip ? 1 : 0,
+      tags,
+      nowIso(),
+    )
+    .run();
+  return c.json({ ok: true, key, vip });
+});
+
+adminRoutes.delete('/admin/vip/tag/:key', async (c) => {
+  await requireAdmin(c);
+  await c.env.DB.prepare('DELETE FROM video_tags WHERE key = ?').bind(c.req.param('key')).run();
+  return c.json({ ok: true });
+});
+
+adminRoutes.post('/admin/vip/all', async (c) => {
+  await requireAdmin(c);
+  const body = await c.req.json<Record<string, unknown>>().catch(() => ({} as Record<string, unknown>));
+  const vip = body.vip === true || body.vip === 'true' || body.vip === 1;
+  await c.env.DB.prepare(
+    'INSERT INTO app_settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+  )
+    .bind('vipAll', vip ? '1' : '0')
+    .run();
+  clearSettingsCache();
+  return c.json({ ok: true, vipAll: vip });
+});
+
+adminRoutes.get('/admin/ledger', async (c) => {  await requireAdmin(c);
   const rows = await c.env.DB.prepare(
     `SELECT l.*, u.username FROM points_ledger l JOIN users u ON u.id = l.user_id
      ORDER BY l.created_at DESC LIMIT 80`,

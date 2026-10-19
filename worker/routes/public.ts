@@ -44,6 +44,10 @@ publicRoutes.get('/config', async (c) => {
     announcement: settings.announcement,
     adMode: settings.adMode,
     registrationOpen: settings.registrationOpen,
+    welcomePoints: settings.welcomePoints,
+    inviteOnly: settings.inviteOnly,
+    vipAll: settings.vipAll,
+    vipLabel: settings.vipLabel,
     stats: { ...catalogStats(), members },
   });
 });

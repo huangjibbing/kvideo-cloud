@@ -6,6 +6,8 @@ import { findVideoSource, VIDEO_SOURCES, type VideoSource } from '../../shared/s
 import type { AppEnv } from '../lib/db';
 import { clientIp, rateLimit, requireUser } from '../lib/db';
 import { createSignedProxyUrl, isSafeRemoteUrl } from '../lib/sign';
+import { isVipMember, loadVipResolver } from '../lib/vip';
+import { normalizeVideoKey } from '../../shared/vip';
 
 export const aggregateRoutes = new Hono<AppEnv>();
 
@@ -131,6 +133,7 @@ async function searchOneSource(source: VideoSource, query: string) {
       actor: clean(item.vod_actor),
       director: clean(item.vod_director),
       offers: [offer],
+      vip: false,
     } satisfies AggregateResult;
   });
   searchCache.set(cacheKey, { at: Date.now(), value: results });
@@ -186,7 +189,11 @@ aggregateRoutes.get('/aggregate/search', async (c) => {
   });
 
   results.sort((a, b) => b.offers.length - a.offers.length || b.year.localeCompare(a.year));
-  const response: AggregateSearchResponse = { results, sources: reports };
+  const vip = await loadVipResolver(c.env, { search: true });
+  const response: AggregateSearchResponse = {
+    results: results.map((item) => ({ ...item, vip: vip.resolver(item.key) })),
+    sources: reports,
+  };
   return c.json(response);
 });
 
@@ -224,7 +231,13 @@ aggregateRoutes.get('/aggregate/detail', async (c) => {
   if (!vodId) throw new HTTPException(400, { message: '缺少影片 ID' });
   const cacheKey = `${source.id}:${vodId}`;
   const cached = detailCache.get(cacheKey);
-  if (cached && Date.now() - cached.at < SEARCH_TTL) return c.json(cached.value);
+  if (cached && Date.now() - cached.at < SEARCH_TTL) {
+    const vip = await loadVipResolver(c.env, { search: true });
+    return c.json({
+      ...cached.value,
+      vip: vip.resolver(normalizeVideoKey(cached.value.title, cached.value.year)),
+    });
+  }
 
   let payload: Record<string, unknown>;
   try {
@@ -253,7 +266,10 @@ aggregateRoutes.get('/aggregate/detail', async (c) => {
     director: clean(item.vod_director),
     content: clean(item.vod_content ?? item.vod_blurb).replace(/<[^>]+>/g, '').slice(0, 1200),
     groups: parsePlayGroups(item.vod_play_from, item.vod_play_url),
+    vip: false,
   };
+  const vip = await loadVipResolver(c.env, { search: true });
+  detail.vip = vip.resolver(normalizeVideoKey(detail.title, detail.year));
   detailCache.set(cacheKey, { at: Date.now(), value: detail });
   return c.json(detail);
 });
@@ -308,6 +324,16 @@ aggregateRoutes.post('/aggregate/play', async (c) => {
   if (!rateLimit(`aggregate-play:${user.id}`, 60, 60_000)) {
     throw new HTTPException(429, { message: '播放请求过于频繁' });
   }
+  const playTitle = String(body.title ?? '');
+  const playYear = String(body.year ?? '');
+  const key = String(body.key ?? '') || normalizeVideoKey(playTitle, playYear);
+  const vip = await loadVipResolver(c.env, { search: true });
+  const isVip = vip.resolver(key);
+  if (isVip && !isVipMember(user)) {
+    throw new HTTPException(403, {
+      message: `${vip.vipLabel || 'VIP'} 专属内容，请先开通会员`,
+    });
+  }
   let resolved: { url: string; kind: 'hls' | 'file'; referer: string };
   try {
     resolved = await resolvePlayable(source, episodeUrl);
@@ -334,5 +360,6 @@ aggregateRoutes.post('/aggregate/play', async (c) => {
     title: String(body.title ?? '').slice(0, 160),
     episode: String(body.episode ?? '').slice(0, 120),
     expiresAt: new Date(expiresAt).toISOString(),
+    vip: isVip,
   });
 });

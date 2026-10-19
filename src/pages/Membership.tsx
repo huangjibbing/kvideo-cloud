@@ -22,6 +22,7 @@ import { api, formatDate, reasonLabel } from '../lib/api';
 import { Link } from '../lib/router';
 import { GroupBadge } from '../components/GroupBadge';
 import { Modal } from '../components/Modal';
+import { isVipPublicUser } from '../../shared/vip';
 
 const PLAN_ICONS: Record<string, React.ComponentType<{ size?: number }>> = {
   month: Zap,
@@ -158,6 +159,23 @@ export function MembershipPage() {
           </div>
         </div>
       </section>
+
+      <div className="membership-vip-access">
+        <Crown size={20} />
+        <div>
+          <b>{isVipPublicUser(me?.user) ? '已解锁 VIP 专属影片' : '升级会员，解锁全站 VIP 影片'}</b>
+          <span>
+            光影会员、星幕会员与永恒会员可播放带 VIP 标签的影片；免费用户仍可浏览与搜索全部内容。
+          </span>
+        </div>
+        {me?.user ? (
+          <span className="vip-chip">{isVipPublicUser(me.user) ? 'VIP 已激活' : '未激活'}</span>
+        ) : (
+          <button type="button" className="btn btn-gold btn-compact" onClick={() => openAuth('login')}>
+            登录查看
+          </button>
+        )}
+      </div>
 
       <section className="section" id="plans">
         <div className="section-head">

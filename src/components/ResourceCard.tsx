@@ -45,6 +45,7 @@ export function ResourceCard({
             <Star size={10} fill="currentColor" /> {item.score.toFixed(1)}
           </span>
         ) : null}
+        {item.vip ? <span className="resource-vip">VIP</span> : null}
         <span className="resource-play">
           <Play size={17} fill="currentColor" />
         </span>

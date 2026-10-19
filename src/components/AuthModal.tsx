@@ -15,6 +15,7 @@ import { Brand } from './Brand';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { CATALOG } from '../../shared/catalog';
+import { api } from '../lib/api';
 
 export function AuthModal() {
   const { authMode, closeAuth, openAuth, login, register } = useAuth();
@@ -26,6 +27,7 @@ export function AuthModal() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [siteConfig, setSiteConfig] = useState({ welcomePoints: 50, inviteOnly: false });
 
   const mode = authMode ?? 'login';
   const open = authMode !== null;
@@ -33,6 +35,9 @@ export function AuthModal() {
   useEffect(() => {
     setError('');
     setSubmitting(false);
+    api<{ welcomePoints: number; inviteOnly: boolean }>('/config')
+      .then((config) => setSiteConfig(config))
+      .catch(() => undefined);
   }, [authMode]);
 
   const submit = async (event: React.FormEvent) => {
@@ -45,7 +50,7 @@ export function AuthModal() {
         push('欢迎回来，光影继续。', 'success');
       } else {
         await register({ email, username, password, inviteCode: inviteCode || undefined });
-        push('账号已创建，已送出 50 积分。', 'success');
+        push('账号已创建，欢迎积分已到账。', 'success');
       }
       setPassword('');
       closeAuth();
@@ -96,7 +101,7 @@ export function AuthModal() {
           <p>
             {mode === 'login'
               ? '收藏、进度、积分与会员身份都在这里。'
-              : '注册即得 50 积分，连续签到还能解锁更多权益。'}
+              : `注册即得 ${siteConfig.welcomePoints} 积分，连续签到还能解锁更多权益。`}
           </p>
         </div>
         <form onSubmit={submit} className="auth-form">
@@ -157,7 +162,7 @@ export function AuthModal() {
           {mode === 'register' ? (
             <label className="field">
               <span>
-                邀请码 <em>可选</em>
+                邀请码 <em>{siteConfig.inviteOnly ? '必填' : '可选'}</em>
               </span>
               <div className="field-input">
                 <Ticket size={16} />
@@ -166,6 +171,7 @@ export function AuthModal() {
                   onChange={(event) => setInviteCode(event.target.value.toUpperCase())}
                   placeholder="KV-XXXXXX"
                   autoComplete="off"
+                  required={siteConfig.inviteOnly}
                 />
               </div>
             </label>

@@ -21,8 +21,9 @@ import { useToast } from '../context/ToastContext';
 import { api, formatDate, formatNumber, reasonLabel } from '../lib/api';
 import { Link } from '../lib/router';
 import { GroupBadge } from '../components/GroupBadge';
+import { AdminVipPanel } from '../components/AdminVipPanel';
 
-type Tab = 'overview' | 'users' | 'settings';
+type Tab = 'overview' | 'users' | 'vip' | 'settings';
 
 interface AdminLedger {
   id: string;
@@ -161,6 +162,7 @@ export function AdminPage() {
         {[
           { id: 'overview', label: '总览', icon: BarChart3 },
           { id: 'users', label: '用户管理', icon: Users },
+          { id: 'vip', label: '内容与 VIP', icon: Crown },
           { id: 'settings', label: '站点设置', icon: Settings },
         ].map((item) => {
           const Icon = item.icon;
@@ -364,6 +366,8 @@ export function AdminPage() {
           </p>
         </section>
       ) : null}
+
+      {tab === 'vip' ? <AdminVipPanel /> : null}
 
       {tab === 'settings' ? (
         <div className="admin-two-col settings-admin">

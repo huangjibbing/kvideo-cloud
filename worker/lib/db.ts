@@ -77,6 +77,11 @@ const DEFAULT_SETTINGS: SiteSettings = {
   announcement: '',
   registrationOpen: true,
   watchRewardEnabled: true,
+  vipAll: false,
+  vipAutoSearch: false,
+  vipLabel: 'VIP',
+  inviteOnly: false,
+  welcomePoints: 50,
 };
 
 let settingsCache: { at: number; value: SiteSettings } | null = null;
@@ -97,6 +102,11 @@ export async function getSettings(env: Env, force = false): Promise<SiteSettings
       announcement: map.get('announcement') ?? '',
       registrationOpen: map.get('registrationOpen') !== '0',
       watchRewardEnabled: map.get('watchRewardEnabled') !== '0',
+      vipAll: map.get('vipAll') === '1',
+      vipAutoSearch: map.get('vipAutoSearch') === '1',
+      vipLabel: map.get('vipLabel') || 'VIP',
+      inviteOnly: map.get('inviteOnly') === '1',
+      welcomePoints: Math.max(0, Math.min(10000, Number(map.get('welcomePoints') ?? 50) || 0)),
     };
     settingsCache = { at: Date.now(), value: settings };
     return settings;

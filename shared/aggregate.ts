@@ -20,6 +20,7 @@ export interface AggregateResult {
   actor: string;
   director: string;
   offers: AggregateOffer[];
+  vip: boolean;
 }
 
 export interface AggregateSourceReport {
@@ -61,6 +62,7 @@ export interface AggregateDetail {
   director: string;
   content: string;
   groups: AggregatePlayGroup[];
+  vip: boolean;
 }
 
 export interface AggregatePlayResponse {
@@ -72,6 +74,7 @@ export interface AggregatePlayResponse {
   title: string;
   episode: string;
   expiresAt: string;
+  vip: boolean;
 }
 
 /** Extract an HLS/MP4 URL from a MacCMS share/player page. */

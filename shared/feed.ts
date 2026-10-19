@@ -26,6 +26,7 @@ export interface FeedItem {
   score: number;
   categories: FeedCategory[];
   offers: FeedOffer[];
+  vip: boolean;
   sourceId: string;
   sourceName: string;
   vodId: string;
