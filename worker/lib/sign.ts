@@ -90,6 +90,59 @@ export function isSafeRemoteUrl(raw: string) {
   return true;
 }
 
+export interface ProxyGrant {
+  o: string;
+  e: string;
+  t: string;
+}
+
+function expirySeconds(expiresAt: number) {
+  return Math.floor((expiresAt < 1e12 ? expiresAt * 1000 : expiresAt) / 1000);
+}
+
+async function scopeSignature(secret: string, o: string, m: string, r: string, e: string) {
+  return sign(secret, `scope.${o}.${m}.${r}.${e}`);
+}
+
+/**
+ * A playlist can contain hundreds of segments. Signing each child URL one by
+ * one would burn the Worker CPU budget, so we sign one short-lived grant for a
+ * small set of origins and reuse it for every URI in that playlist.
+ */
+export async function createPlaylistGrant(
+  origins: string[],
+  mode: AdFilterMode,
+  referer: string | undefined,
+  secret: string,
+  expiresAt: number,
+): Promise<ProxyGrant> {
+  const o = bytesToBase64Url(encoder.encode(JSON.stringify(origins)));
+  const e = String(expirySeconds(expiresAt));
+  const r = referer ? bytesToBase64Url(encoder.encode(referer)) : '';
+  const t = await scopeSignature(secret, o, mode, r, e);
+  return { o, e, t };
+}
+
+export function buildScopedProxyUrl(
+  origin: string,
+  targetUrl: string,
+  mode: AdFilterMode,
+  referer: string | undefined,
+  grant: ProxyGrant,
+) {
+  const u = bytesToBase64Url(encoder.encode(targetUrl));
+  const r = referer ? bytesToBase64Url(encoder.encode(referer)) : '';
+  const params = new URLSearchParams({
+    u,
+    m: mode,
+    r,
+    e: grant.e,
+    o: grant.o,
+    t: grant.t,
+  });
+  return `${origin}/api/hls?${params.toString()}`;
+}
+
 export async function createSignedProxyUrl(
   origin: string,
   target: ProxyTarget,
@@ -99,8 +152,7 @@ export async function createSignedProxyUrl(
   const u = bytesToBase64Url(encoder.encode(target.url));
   const m = target.mode;
   const r = target.referer ? bytesToBase64Url(encoder.encode(target.referer)) : '';
-  const expiresAtSeconds = Math.floor((expiresAt < 1e12 ? expiresAt * 1000 : expiresAt) / 1000);
-  const e = String(expiresAtSeconds);
+  const e = String(expirySeconds(expiresAt));
   const signature = await sign(secret, `${u}.${m}.${r}.${e}`);
   const params = new URLSearchParams({ u, m, r, e, s: signature });
   return `${origin}/api/hls?${params.toString()}`;
@@ -120,14 +172,13 @@ export async function verifyProxyUrl(requestUrl: string, secret: string) {
   const r = url.searchParams.get('r') ?? '';
   const e = url.searchParams.get('e') ?? '';
   const s = url.searchParams.get('s') ?? '';
-  if (!u || !m || !e || !s) return null;
+  const o = url.searchParams.get('o') ?? '';
+  const t = url.searchParams.get('t') ?? '';
+  if (!u || !m || !e) return null;
   if (!['off', 'standard', 'strict', 'aggressive'].includes(m)) return null;
   const expiresAt = Number(e);
   if (!Number.isFinite(expiresAt) || expiresAt < Date.now() / 1000) return null;
   if (expiresAt > Date.now() / 1000 + 86_400) return null;
-
-  const expected = await sign(secret, `${u}.${m}.${r}.${e}`);
-  if (!safeEqual(expected, s)) return null;
 
   let target = '';
   let referer = '';
@@ -138,6 +189,25 @@ export async function verifyProxyUrl(requestUrl: string, secret: string) {
     return null;
   }
   if (!isSafeRemoteUrl(target)) return null;
+
+  if (o && t) {
+    const expectedScope = await scopeSignature(secret, o, m, r, e);
+    if (!safeEqual(expectedScope, t)) return null;
+    let origins: unknown;
+    try {
+      origins = JSON.parse(new TextDecoder().decode(base64UrlToBytes(o)));
+    } catch {
+      return null;
+    }
+    if (!Array.isArray(origins) || origins.length === 0 || origins.length > 16) return null;
+    if (!origins.every((origin) => typeof origin === 'string')) return null;
+    if (!origins.includes(new URL(target).origin)) return null;
+  } else {
+    if (!s) return null;
+    const expected = await sign(secret, `${u}.${m}.${r}.${e}`);
+    if (!safeEqual(expected, s)) return null;
+  }
+
   if (referer && !isSafeRemoteUrl(referer)) referer = '';
   return {
     url: target,

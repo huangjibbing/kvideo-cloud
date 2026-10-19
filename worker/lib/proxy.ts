@@ -1,13 +1,19 @@
 import type { Context } from 'hono';
 import {
   filterM3u8,
+  resolvePlaylistUri,
   rewritePlaylistUris,
   type AdFilterMode,
 } from '../../shared/adfilter';
 import type { AppEnv } from './db';
 import { getSettings } from './db';
-import { createSignedProxyUrl, isSafeRemoteUrl, verifyProxyUrl } from './sign';
-import { safeEqual } from './auth';
+import {
+  buildScopedProxyUrl,
+  createPlaylistGrant,
+  createSignedProxyUrl,
+  isSafeRemoteUrl,
+  verifyProxyUrl,
+} from './sign';
 
 const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Origin': '*',
@@ -29,6 +35,33 @@ function playlistLike(contentType: string, target: string, finalUrl: string) {
   const type = contentType.toLowerCase();
   if (type.includes('mpegurl') || type.includes('m3u8')) return true;
   return /\.m3u8(?:$|\?)/i.test(target) || /\.m3u8$/i.test(new URL(finalUrl).pathname);
+}
+
+function collectPlaylistOrigins(content: string, baseUrl: string) {
+  const urls = new Set<string>();
+  for (const raw of content.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (line.startsWith('#')) {
+      for (const match of line.matchAll(/URI="([^"]+)"/g)) {
+        if (match[1]) urls.add(resolvePlaylistUri(match[1], baseUrl));
+      }
+      continue;
+    }
+    urls.add(resolvePlaylistUri(line, baseUrl));
+  }
+  const origins = new Set<string>();
+  for (const value of urls) {
+    try {
+      const url = new URL(value);
+      if ((url.protocol === 'https:' || url.protocol === 'http:') && isSafeRemoteUrl(value)) {
+        origins.add(url.origin);
+      }
+    } catch {
+      // Ignore malformed child URIs.
+    }
+  }
+  return [...origins];
 }
 
 export async function hlsProxy(c: Context<AppEnv>) {
@@ -119,11 +152,23 @@ export async function hlsProxy(c: Context<AppEnv>) {
       const mode: AdFilterMode = verified.mode;
       const filtered = filterM3u8(text, finalUrl, { mode, keywords });
       const baseOrigin = new URL(c.req.url).origin;
+      const origins = collectPlaylistOrigins(filtered.content, finalUrl);
+      const grant =
+        origins.length > 0 && origins.length <= 12
+          ? await createPlaylistGrant(
+              origins,
+              mode,
+              verified.referer,
+              secret,
+              verified.expiresAt,
+            )
+          : null;
       const rewritten = await rewritePlaylistUris(
         filtered.content,
         finalUrl,
         async (absolute) => {
           if (!isSafeRemoteUrl(absolute)) return absolute;
+          if (grant) return buildScopedProxyUrl(baseOrigin, absolute, mode, verified.referer, grant);
           return createSignedProxyUrl(
             baseOrigin,
             { url: absolute, mode, referer: verified.referer },
@@ -180,5 +225,3 @@ export async function hlsProxy(c: Context<AppEnv>) {
     headers,
   });
 }
-
-export { safeEqual };
