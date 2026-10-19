@@ -256,6 +256,8 @@ export function SearchPage() {
           sourceId: activeSourceId,
           url: episode.url,
           title: detail.title,
+          year: detail.year,
+          key: selected?.key,
           episode: episode.name,
         },
       });
