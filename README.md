@@ -2,6 +2,9 @@
 
 > 一个运行在 **Cloudflare Workers** 上的开放电影放映室。以 KVideo 的 Liquid Glass 视觉语言为灵感，重新设计了界面与播放链路，并加入**切片级 HLS 广告过滤**、D1 账号体系、八种用户组、会员通行证与完整积分系统。
 
+**线上地址**：<https://kvideo-cloud.2784355408.workers.dev>  
+> `workers.dev` 在中国大陆部分网络会被 DNS 污染 / SNI 阻断；如无法打开，请在 Cloudflare Dashboard 为 Worker 绑定自有域名。
+
 ![KVideo Cloud 首页](docs/preview.png)
 
 ## 为什么是 KVideo Cloud

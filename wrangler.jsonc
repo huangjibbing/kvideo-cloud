@@ -3,6 +3,8 @@
   "name": "kvideo-cloud",
   "main": "worker/index.ts",
   "compatibility_date": "2025-10-01",
+  "workers_dev": true,
+  "preview_urls": false,
   "assets": {
     "directory": "./dist",
     "binding": "ASSETS",
@@ -13,7 +15,7 @@
     {
       "binding": "DB",
       "database_name": "kvideo-db",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "4d7c0e56-90da-46a7-bec2-440e847f8bcd",
       "migrations_dir": "migrations"
     }
   ],
