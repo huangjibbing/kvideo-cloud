@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import type { AggregateDetail, AggregateEpisode, AggregateOffer, AggregateResult, AggregateSearchResponse } from '../../shared/aggregate';
+import { extractMediaUrlFromHtml } from '../../shared/aggregate';
 import { findVideoSource, VIDEO_SOURCES, type VideoSource } from '../../shared/sources';
 import type { AppEnv } from '../lib/db';
 import { clientIp, rateLimit, requireUser } from '../lib/db';
@@ -257,50 +258,6 @@ aggregateRoutes.get('/aggregate/detail', async (c) => {
   return c.json(detail);
 });
 
-function extractMediaUrl(text: string, pageUrl: string) {
-  const cleaned = text
-    .replace(/\\\//g, '/')
-    .replace(/\\u002F/gi, '/')
-    .replace(/&amp;/g, '&');
-  const absolutize = (value: string) => {
-    if (!value) return '';
-    if (value.startsWith('//')) return `https:${value}`;
-    try {
-      return new URL(value, pageUrl).toString();
-    } catch {
-      return '';
-    }
-  };
-  const mediaFrom = (value: string) => {
-    const url = absolutize(value.trim());
-    return /\.(m3u8|mp4)(?:[?#]|$)/i.test(url) ? url : '';
-  };
-
-  const player = cleaned.match(/player_[a-zA-Z0-9_]+\s*=\s*(\{[\s\S]*?\})\s*;?\s*<\/script>/);
-  if (player) {
-    try {
-      const data = JSON.parse(player[1]) as { url?: string };
-      const url = data.url ? mediaFrom(data.url) : '';
-      if (url) return url;
-    } catch {
-      // Fall through to source-level extraction.
-    }
-  }
-
-  // MacCMS share pages commonly expose `const url = "/path/index.m3u8?sign=..."`.
-  const assignments = [
-    ...cleaned.matchAll(/(?:const|let|var)\s+(?:url|vid|videoUrl|playUrl)\s*=\s*['"]([^'"]+)['"]/gi),
-    ...cleaned.matchAll(/\burl\s*:\s*['"]([^'"]+)['"]/gi),
-    ...cleaned.matchAll(/['"]([^'"]+?\.m3u8[^'"]*)['"]/gi),
-    ...cleaned.matchAll(/['"]([^'"]+?\.mp4[^'"]*)['"]/gi),
-  ];
-  for (const match of assignments) {
-    const url = mediaFrom(match[1] ?? '');
-    if (url) return url;
-  }
-  return '';
-}
-
 async function resolvePlayable(source: VideoSource, episodeUrl: string) {
   if (/\.(m3u8|mp4)(?:[?#]|$)/i.test(episodeUrl)) {
     return {
@@ -329,7 +286,7 @@ async function resolvePlayable(source: VideoSource, episodeUrl: string) {
     if (text.trimStart().startsWith('#EXTM3U') || /\.m3u8(?:[?#]|$)/i.test(finalUrl)) {
       return { url: finalUrl, kind: 'hls' as const, referer: finalUrl };
     }
-    const media = extractMediaUrl(text, finalUrl);
+    const media = extractMediaUrlFromHtml(text, finalUrl);
     if (!media) throw new Error('未能从播放页解析出 m3u8/mp4 地址');
     return {
       url: media,

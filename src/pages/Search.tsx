@@ -22,6 +22,7 @@ import type {
   AggregateResult,
   AggregateSearchResponse,
 } from '../../shared/aggregate';
+import { extractMediaUrlFromHtml } from '../../shared/aggregate';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
 import { api, ApiError } from '../lib/api';
@@ -32,7 +33,7 @@ import { Player } from '../components/Player';
 const EXAMPLES = ['哪吒', '流浪地球', '甄嬛传', '沙丘', '狂飙', '奥本海默'];
 const BATCH_SIZE = 8;
 const CONCURRENCY = 3;
-const PREFERRED_SOURCES = ['zuida', 'feifan', 'jisu', 'baofeng', 'baiduyun'];
+const PREFERRED_SOURCES = ['zuida', 'huya', 'baofeng', 'feifan', 'jisu', 'baiduyun'];
 
 function preferredOffer(result: AggregateResult) {
   for (const id of PREFERRED_SOURCES) {
@@ -40,6 +41,19 @@ function preferredOffer(result: AggregateResult) {
     if (offer) return offer;
   }
   return result.offers[0];
+}
+
+async function resolveShareInBrowser(pageUrl: string) {
+  const response = await fetch(pageUrl, {
+    headers: { Accept: 'text/html,application/xhtml+xml,*/*' },
+    credentials: 'omit',
+  });
+  if (!response.ok) throw new Error(`播放页返回 HTTP ${response.status}`);
+  const text = await response.text();
+  if (text.trimStart().startsWith('#EXTM3U')) return pageUrl;
+  const media = extractMediaUrlFromHtml(text, response.url || pageUrl);
+  if (!media) throw new Error('播放页中没有可识别的 m3u8/mp4');
+  return media;
 }
 
 function mergeResults(current: AggregateResult[], incoming: AggregateResult[]) {
@@ -241,7 +255,29 @@ export function SearchPage() {
       });
       setPlaySession(data);
     } catch (error) {
-      if (error instanceof ApiError && error.status === 401) openAuth('login');
+      if (error instanceof ApiError && error.status === 401) {
+        openAuth('login');
+        return;
+      }
+      if (!episode.direct) {
+        try {
+          push('服务器解析受限，正在尝试浏览器解析线路…', 'info');
+          const directUrl = await resolveShareInBrowser(episode.url);
+          setPlaySession({
+            url: '',
+            directUrl,
+            mode: 'strict',
+            kind: /\.mp4(?:[?#]|$)/i.test(directUrl) ? 'file' : 'hls',
+            sourceName: detail.sourceName,
+            title: detail.title,
+            episode: episode.name,
+            expiresAt: '',
+          });
+          return;
+        } catch {
+          // Fall through to the original server error.
+        }
+      }
       push(error instanceof Error ? error.message : '播放失败', 'error');
     } finally {
       setPlayLoading('');
