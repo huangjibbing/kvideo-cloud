@@ -3,6 +3,7 @@ import {
   Compass,
   Crown,
   Code2,
+  Film,
   Home,
   LayoutGrid,
   LogIn,
@@ -13,6 +14,7 @@ import {
   Sparkles,
   Sun,
   Trophy,
+  Tv,
   UserRound,
 } from 'lucide-react';
 import { Link, useQuery, useRouter } from '../lib/router';
@@ -22,15 +24,24 @@ import { AuthModal } from './AuthModal';
 
 const NAV = [
   { to: '/', label: '首页', icon: Home },
-  { to: '/browse', label: '片库', icon: LayoutGrid },
-  { to: '/sources', label: '资源站', icon: Server },
+  { to: '/browse?cat=movie', label: '电影', icon: Film },
+  { to: '/browse?cat=series', label: '电视剧', icon: Tv },
+  { to: '/browse?cat=anime', label: '动漫', icon: Sparkles },
+  { to: '/browse?cat=variety', label: '综艺', icon: Compass },
   { to: '/membership', label: '会员', icon: Crown },
-  { to: '/leaderboard', label: '榜单', icon: Trophy },
 ];
 
-function isActive(path: string, to: string) {
-  if (to === '/') return path === '/';
-  return path === to || path.startsWith(`${to}/`);
+function isActive(path: string, to: string, search: string) {
+  const [targetPath, targetQuery] = to.split('?');
+  if (targetPath === '/') return path === '/';
+  if (!path.startsWith(targetPath)) return false;
+  if (!targetQuery) return true;
+  const params = new URLSearchParams(targetQuery);
+  const current = new URLSearchParams(search);
+  for (const [key, value] of params) {
+    if (current.get(key) !== value) return false;
+  }
+  return true;
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -75,12 +86,16 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <Brand />
           <nav className="desktop-nav" aria-label="主导航">
             {NAV.map((item) => (
-              <Link key={item.to} to={item.to} className={isActive(path, item.to) ? 'active' : ''}>
+              <Link
+                key={item.to}
+                to={item.to}
+                className={isActive(path, item.to, query.toString()) ? 'active' : ''}
+              >
                 {item.label}
               </Link>
             ))}
             {me?.user?.role === 'admin' || me?.user?.role === 'superadmin' ? (
-              <Link to="/admin" className={isActive(path, '/admin') ? 'active' : ''}>
+              <Link to="/admin" className={isActive(path, '/admin', query.toString()) ? 'active' : ''}>
                 后台
               </Link>
             ) : null}
@@ -92,7 +107,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 placeholder="搜索片名、类型…"
-                aria-label="搜索片库"
+                aria-label="聚合搜索影片"
               />
               <kbd>↵</kbd>
             </form>
@@ -128,21 +143,24 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <div className="footer-grid">
           <div className="footer-brand">
             <Brand />
-            <p>一个运行在 Cloudflare Workers 上的开放电影放映室。严格过滤 HLS 插播广告，保留完整故事时间轴。</p>
+            <p>一个运行在 Cloudflare Workers 上的视频聚合放映室。聚合资源站海报与内容，严格过滤 HLS 插播广告。</p>
             <div className="footer-tags">
               <span>Workers</span>
               <span>D1</span>
               <span>HLS</span>
-              <span>Open Cinema</span>
+              <span>Resource Hub</span>
             </div>
           </div>
           <div className="footer-col">
-            <h4>探索</h4>
-            <Link to="/browse">全部片库</Link>
+            <h4>频道</h4>
+            <Link to="/browse?cat=movie">电影</Link>
+            <Link to="/browse?cat=series">电视剧</Link>
+            <Link to="/browse?cat=anime">动漫</Link>
+            <Link to="/browse?cat=variety">综艺</Link>
+            <Link to="/browse?cat=domestic">国产剧</Link>
+            <Link to="/browse?cat=overseas">海外剧</Link>
             <Link to="/search">聚合搜索</Link>
-            <Link to="/browse?type=film">开放电影</Link>
             <Link to="/sources">资源站目录</Link>
-            <Link to="/browse?type=demo">技术实验室</Link>
             <Link to="/leaderboard">光影榜单</Link>
           </div>
           <div className="footer-col">
@@ -163,20 +181,20 @@ export function Layout({ children }: { children: React.ReactNode }) {
               <ShieldCheck size={14} /> Workers 文档
             </a>
             <span className="footer-note">
-              <Sparkles size={13} /> 仅收录公开授权样片
+              <Sparkles size={13} /> 内容来自第三方资源站
             </span>
           </div>
         </div>
         <div className="footer-bottom">
           <span>© 2026 KVideo Cloud. Built for the open web.</span>
-          <span>灵感来自 KVideo · 本部署不内置任何未授权影视资源</span>
+          <span>本部署不内置影视文件 · 内容与海报由第三方资源站提供</span>
         </div>
       </footer>
 
       <nav className="mobile-nav" aria-label="移动端导航">
         {[
           { to: '/', label: '首页', icon: Compass },
-          { to: '/browse', label: '片库', icon: LayoutGrid },
+          { to: '/browse?cat=movie', label: '电影', icon: Film },
           { to: '/search', label: '搜索', icon: Search },
           { to: '/membership', label: '会员', icon: Crown },
           { to: me?.user ? '/me' : '/login', label: '我的', icon: UserRound },
@@ -187,7 +205,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
             <button
               key={item.label}
               type="button"
-              className={isActive(path, target) ? 'active' : ''}
+              className={isActive(path, target, query.toString()) ? 'active' : ''}
               onClick={() => {
                 if (item.to === '/login') openAuth('login');
                 else navigate(item.to);

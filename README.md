@@ -1,6 +1,6 @@
 # KVideo Cloud · 纯净放映室
 
-> 一个运行在 **Cloudflare Workers** 上的开放电影放映室。以 KVideo 的 Liquid Glass 视觉语言为灵感，重新设计了界面与播放链路，并加入**切片级 HLS 广告过滤**、D1 账号体系、八种用户组、会员通行证与完整积分系统。
+> 一个运行在 **Cloudflare Workers** 上的视频聚合放映室。以 KVideo 的 Liquid Glass 视觉语言为灵感，从资源站拉取海报与内容，提供爱奇艺式频道分类、**切片级 HLS 广告过滤**、D1 账号体系、八种用户组、会员通行证与完整积分系统。
 
 **线上地址**：<https://kvideo-cloud.2784355408.workers.dev>  
 > `workers.dev` 在中国大陆部分网络会被 DNS 污染 / SNI 阻断；如无法打开，请在 Cloudflare Dashboard 为 Worker 绑定自有域名。
@@ -27,14 +27,16 @@ KVideo Cloud 的代理会在云端解析每一份主/子播放列表，识别并
 - **四种模式**：`strict`（默认）/ `standard` / `aggressive` / `off`，每个播放会话独立签名。
 - **客户端提示**：从清单响应头读取 `X-KV-Ads-Removed`，播放器顶部实时显示已净化切片数。
 
-### 播放与片库
+### 动态首页与频道
 
-- hls.js 播放器：清晰度切换、倍速、音量、全屏、画中画、键盘快捷键、断点续播、错误重试。
-- 播放进度自动保存；观看满 5 分钟获得积分。
-- 主播放列表 / 子播放列表 / AES-128 密钥 / 分片全部经签名代理。
-- 公开片库只收录 Blender 开放电影与 Apple / Shaka / Mux / Unified Streaming 官方测试流。
+- 首页从 6 个 `normal` 资源站拉取最新 3 页内容，并额外抓取电影分类页；合并同名影片、收藏线路与海报。
+- 爱奇艺式频道：电影、电视剧、动漫、综艺、国产剧、海外剧、纪录片、短剧。
+- 每个频道展示资源站海报、年份、类型、备注、评分与可用线路数。
+- 首页包含今日推荐 Hero、热播榜单、各频道精选、会员与排行榜模块。
+- 静态测试片源已从首页/频道移除，仅保留技术路由，不再出现在主内容区。
+- 点击海报进入 `/resource/:source/:id`，直接读取资源站详情、剧集与播放线路。
+- hls.js 播放器：清晰度切换、倍速、音量、全屏、画中画、键盘快捷键、错误重试。
 - 自定义 HLS 片源，按用户组限制 3–100 个额度，仅所有者可见。
-- 搜索、类型、标签、排序、精选、趋势、新上线。
 
 ### 资源站目录
 
@@ -98,11 +100,12 @@ worker/
   lib/points.ts        签到、积分、等级
   lib/proxy.ts         签名 HLS 代理、重写、过滤头
   lib/sign.ts          HMAC 签名 / SSRF 校验
-  routes/              auth / public / aggregate / library / membership / admin
+  routes/              auth / public / feed / aggregate / library / membership / admin
 shared/
   adfilter.ts          纯函数广告过滤引擎
   aggregate.ts         聚合搜索类型
-  catalog.ts           公开片库
+  catalog.ts           公开测试片库
+  feed.ts              首页频道、资源卡片与分类类型
   levels.ts            用户组、等级、会员方案
   sources.ts           资源站类型与统计
   types.ts             共享类型

@@ -9,6 +9,7 @@ import { libraryRoutes } from './routes/library';
 import { membershipRoutes } from './routes/membership';
 import { adminRoutes } from './routes/admin';
 import { aggregateRoutes } from './routes/aggregate';
+import { feedRoutes } from './routes/feed';
 
 const app = new Hono<AppEnv>();
 
@@ -55,6 +56,7 @@ app.on(['GET', 'HEAD', 'OPTIONS'], '/api/hls', hlsProxy);
 
 app.route('/api', publicRoutes);
 app.route('/api', authRoutes);
+app.route('/api', feedRoutes);
 app.route('/api', aggregateRoutes);
 app.route('/api', libraryRoutes);
 app.route('/api', membershipRoutes);
