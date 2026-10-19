@@ -10,6 +10,7 @@ import { MembershipPage } from './pages/Membership';
 import { LeaderboardPage } from './pages/Leaderboard';
 import { AdminPage } from './pages/Admin';
 import { SourcesPage } from './pages/Sources';
+import { SearchPage } from './pages/Search';
 import { Link, useRouter } from './lib/router';
 
 function NotFound() {
@@ -41,6 +42,7 @@ function Routes() {
 
   if (segments.length === 0) return <HomePage />;
   if (segments[0] === 'browse') return <BrowsePage />;
+  if (segments[0] === 'search') return <SearchPage />;
   if (segments[0] === 'title' && segments[1]) return <TitlePage id={segments[1]} />;
   if (segments[0] === 'watch' && segments[1]) return <WatchPage id={segments[1]} />;
   if (segments[0] === 'me') return <ProfilePage />;

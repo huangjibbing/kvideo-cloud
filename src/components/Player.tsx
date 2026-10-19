@@ -24,12 +24,21 @@ interface PlayerProps {
   src: string;
   artwork: Pick<CatalogTitle, 'accent' | 'motif' | 'title' | 'originalTitle'>;
   adMode: string;
+  kind?: 'hls' | 'file';
   autoPlay?: boolean;
   onProgress?: (current: number, duration: number) => void;
   onAdStats?: (removed: number) => void;
 }
 
-export function Player({ src, artwork, adMode, autoPlay = true, onProgress, onAdStats }: PlayerProps) {
+export function Player({
+  src,
+  artwork,
+  adMode,
+  kind = 'hls',
+  autoPlay = true,
+  onProgress,
+  onAdStats,
+}: PlayerProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const shellRef = useRef<HTMLDivElement>(null);
   const hlsRef = useRef<Hls | null>(null);
@@ -74,6 +83,16 @@ export function Player({ src, artwork, adMode, autoPlay = true, onProgress, onAd
     if (hlsRef.current) {
       hlsRef.current.destroy();
       hlsRef.current = null;
+    }
+
+    if (kind === 'file') {
+      video.src = src;
+      setLoading(false);
+      if (autoPlay) video.play().catch(() => undefined);
+      return () => {
+        video.removeAttribute('src');
+        video.load();
+      };
     }
 
     const attachAdStats = (data: { networkDetails?: unknown }) => {
@@ -148,7 +167,7 @@ export function Player({ src, artwork, adMode, autoPlay = true, onProgress, onAd
         hlsRef.current = null;
       }
     };
-  }, [src, autoPlay, onAdStats, reloadKey]);
+  }, [src, autoPlay, onAdStats, reloadKey, kind]);
 
   useEffect(() => {
     const video = videoRef.current;

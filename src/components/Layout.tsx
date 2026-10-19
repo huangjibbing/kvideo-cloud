@@ -58,7 +58,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   const submitSearch = (event: React.FormEvent) => {
     event.preventDefault();
     const value = search.trim();
-    navigate(value ? `/browse?q=${encodeURIComponent(value)}` : '/browse');
+    navigate(value ? `/search?q=${encodeURIComponent(value)}` : '/search');
   };
 
   return (
@@ -139,6 +139,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
           <div className="footer-col">
             <h4>探索</h4>
             <Link to="/browse">全部片库</Link>
+            <Link to="/search">聚合搜索</Link>
             <Link to="/browse?type=film">开放电影</Link>
             <Link to="/sources">资源站目录</Link>
             <Link to="/browse?type=demo">技术实验室</Link>
@@ -176,6 +177,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         {[
           { to: '/', label: '首页', icon: Compass },
           { to: '/browse', label: '片库', icon: LayoutGrid },
+          { to: '/search', label: '搜索', icon: Search },
           { to: '/membership', label: '会员', icon: Crown },
           { to: me?.user ? '/me' : '/login', label: '我的', icon: UserRound },
         ].map((item) => {

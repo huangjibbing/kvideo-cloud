@@ -43,6 +43,18 @@ KVideo Cloud 的代理会在云端解析每一份主/子播放列表，识别并
 - 数据静态写入 `data/video-sources.json`，重新导入：`npm run import:sources`。
 - 连接检测通过 Worker 端安全代理完成，只允许目录中的 `baseUrl`，并带每 IP 限流。
 
+### 聚合搜索与播放
+
+- 顶部搜索框默认进入 `/search`，自动把关键词分发到 56 个资源站；每批 8 个源、3 路并发，边搜边出结果。
+- 自动合并同名影片，按收录线路数排序，展示不同资源站的线路数量与来源标签。
+- 点击结果读取该源详情，解析 `vod_play_from` / `vod_play_url` 播放组与剧集。
+- 支持直链 `.m3u8` / `.mp4`，也支持从播放分享页二次解析媒体地址。
+- 播放需要登录，并统一走 `/api/hls` 签名代理与严格广告过滤；直链与解析线路使用同一套过滤策略。
+- 搜索、详情、播放 API：
+  - `GET /api/aggregate/search?q=&ids=`
+  - `GET /api/aggregate/detail?source=&id=`
+  - `POST /api/aggregate/play`
+
 ### 账号、用户组与会员
 
 - 邮箱注册 / 登录，PBKDF2-SHA256（100,000 次）密码哈希，HttpOnly + SameSite=Lax 会话 Cookie，会话哈希落库。
@@ -85,9 +97,10 @@ worker/
   lib/points.ts        签到、积分、等级
   lib/proxy.ts         签名 HLS 代理、重写、过滤头
   lib/sign.ts          HMAC 签名 / SSRF 校验
-  routes/              auth / public / library / membership / admin
+  routes/              auth / public / aggregate / library / membership / admin
 shared/
   adfilter.ts          纯函数广告过滤引擎
+  aggregate.ts         聚合搜索类型
   catalog.ts           公开片库
   levels.ts            用户组、等级、会员方案
   sources.ts           资源站类型与统计
