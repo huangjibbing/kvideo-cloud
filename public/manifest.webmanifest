@@ -1,0 +1,17 @@
+{
+  "name": "KVideo Cloud · 纯净放映室",
+  "short_name": "KVideo",
+  "description": "严格广告过滤的开放电影放映室，运行于 Cloudflare Workers。",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#07090f",
+  "theme_color": "#07090f",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

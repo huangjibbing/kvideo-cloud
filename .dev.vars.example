@@ -1,0 +1,6 @@
+# Local development secrets. Copy to `.dev.vars` (git-ignored, never commit).
+# Generate a long random value for production: openssl rand -base64 48
+SESSION_SECRET=replace-with-a-long-random-session-secret
+PROXY_SECRET=replace-with-a-long-random-proxy-secret
+BOOTSTRAP_ADMIN_EMAIL=admin@example.com
+BOOTSTRAP_ADMIN_PASSWORD=replace-with-a-strong-admin-password
