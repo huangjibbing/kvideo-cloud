@@ -41,13 +41,13 @@ async function pbkdf2(password: string, salt: Uint8Array, iterations: number) {
 
 export async function hashPassword(password: string) {
   const salt = crypto.getRandomValues(new Uint8Array(16));
-  const hash = await pbkdf2(password, salt, 120_000);
+  const hash = await pbkdf2(password, salt, 100_000);
   return { salt: bytesToBase64Url(salt), hash: bytesToBase64Url(hash) };
 }
 
 export async function verifyPassword(password: string, salt: string, expected: string) {
   try {
-    const actual = await pbkdf2(password, base64UrlToBytes(salt), 120_000);
+    const actual = await pbkdf2(password, base64UrlToBytes(salt), 100_000);
     const expectedBytes = base64UrlToBytes(expected);
     if (actual.length !== expectedBytes.length) return false;
     let difference = 0;
