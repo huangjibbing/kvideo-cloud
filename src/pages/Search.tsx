@@ -442,7 +442,10 @@ export function SearchPage() {
                     <button
                       type="button"
                       className="btn btn-primary btn-compact"
-                      onClick={() => void openDetail(result, preferredOffer(result).sourceId)}
+                      onClick={() => {
+                        const offer = preferredOffer(result);
+                        navigate(`/resource/${offer.sourceId}/${offer.vodId}`);
+                      }}
                     >
                       <Play size={14} fill="currentColor" /> 查看线路
                     </button>

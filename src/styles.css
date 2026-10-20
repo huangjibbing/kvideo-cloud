@@ -10000,3 +10000,145 @@ body.tv-mode .watch-topbar {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
+
+/* ---------- mobile polish ---------- */
+
+@media (max-width: 780px) {
+  .feed-loading-hero {
+    height: 300px;
+    border-radius: 24px;
+  }
+
+  .feed-loading-row {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 28px;
+  }
+
+  .aggregate-hero {
+    padding: 22px 16px 18px;
+  }
+
+  .aggregate-hero h1 {
+    font-size: 29px;
+    line-height: 1.03;
+  }
+
+  .aggregate-hero > p {
+    font-size: 11px;
+    line-height: 1.65;
+  }
+
+  .aggregate-search input {
+    height: 38px;
+    font-size: 12px;
+  }
+
+  .aggregate-examples {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: 3px;
+  }
+
+  .aggregate-progress-copy {
+    gap: 4px;
+  }
+
+  .aggregate-card {
+    padding: 9px;
+  }
+
+  .aggregate-card .agg-poster {
+    width: 68px;
+    height: 102px;
+  }
+
+  .resource-page {
+    padding-bottom: 28px;
+  }
+
+  .resource-watch-head {
+    padding-top: 10px;
+  }
+
+  .resource-watch-head h1 {
+    font-size: 28px;
+  }
+
+  .resource-watch-actions {
+    gap: 6px;
+  }
+
+  .resource-watch-actions .btn {
+    min-height: 38px;
+    font-size: 11px;
+  }
+
+  .watch-breadcrumb {
+    width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .resource-watch-side {
+    margin-bottom: 86px;
+    padding: 13px;
+  }
+
+  .resource-side-head h2 {
+    font-size: 18px;
+  }
+
+  .resource-line-card {
+    padding: 10px;
+  }
+
+  .resource-line-card p {
+    font-size: 9px;
+  }
+
+  .resource-episode-grid.compact {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .resource-watch-meta > p {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 5;
+  }
+
+  .resource-vip-banner {
+    padding: 11px 12px;
+  }
+
+  .aggregate-modal {
+    width: calc(100vw - 20px) !important;
+  }
+
+  .aggregate-episodes {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 420px) {
+  .feed-loading-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .resource-grid-six {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .aggregate-hero h1 {
+    font-size: 26px;
+  }
+
+  .aggregate-search .btn {
+    min-height: 38px;
+  }
+
+  .resource-watch-head h1 {
+    font-size: 25px;
+  }
+}
